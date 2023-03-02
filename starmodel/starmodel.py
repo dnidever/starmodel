@@ -185,7 +185,7 @@ def eos(X, Z, XCNO, mu, P, T,izone):
 def dPdr(r, M_r, rho):
     return -cst.G*rho*M_r/r**2
 
-def dMdr(r, rho, cst):
+def dMdr(r, rho):
     return (4*np.pi*rho*r**2)
 
 def dLdr(r, rho, epslon):
@@ -354,8 +354,8 @@ def starmodel(Msolar,Lsolar,Te,X,Z):
     #  Calculate the mass, luminosity, and radius of the star.
     #  The radius is calculated from Prialnik Eq. 1.3 (C&O Eq. 3.17).
     #
-    Ms = cst.Msolar*Msun
-    Ls = cst.Lsolar*Lsun
+    Ms = Msolar*cst.Msun
+    Ls = Lsolar*cst.Lsun
     Rs = np.sqrt(Ls/(4.e0*np.pi*cst.sigma))/Te**2
     Rsolar = Rs/cst.Rsun
 
@@ -520,7 +520,7 @@ def starmodel(Msolar,Lsolar,Te,X,Z):
 
         #  Calculate the density, opacity, and energy generation rate for
         #  this zone.
-        rho[i],kappa[i],epslon[i],tog_bf[i],ierr = eos(X, Z, XCNO, mu, P[i], T[i], i, cst)
+        rho[i],kappa[i],epslon[i],tog_bf[i],ierr = eos(X, Z, XCNO, mu, P[i], T[i], i)
 
         if (ierr != 0):           
             print(' Values from the previous zone are:')
@@ -640,7 +640,7 @@ def starmodel(Msolar,Lsolar,Te,X,Z):
             print('The core density seems a bit off,')
             print(' density should increase smoothly toward the center.')
             print(' The density of the last zone calculated was rho = ',rho[istop],' gm/cm**3')
-            print rhocor,rhomax
+            print(rhocor,rhomax)
         if (rhocor > 1e10):
             print('It looks like you will need a degenerate')
             print(' neutron gas and general relativity')
@@ -698,7 +698,7 @@ def starmodel(Msolar,Lsolar,Te,X,Z):
     f.write('                                    dlnP/dlnT   = {0:12.5E}\n'.format(dlPdlT[istop]))
 
     f.write('Notes:\n')
-    f.write(' (1) Mass is listed as Qm = 1.0 - M_r/Mtot, where Mtot = {0:13.6}\n'.format(Msun))
+    f.write(' (1) Mass is listed as Qm = 1.0 - M_r/Mtot, where Mtot = {0:13.6}\n'.format(cst.Msun))
     f.write(' (2) Convective zones are indicated by c, radiative zones by r\n')
     f.write(' (3) dlnP/dlnT may be limited to +99.9 or -99.9# if so it is\n')
     f.write(' labeled by *\n')
@@ -709,6 +709,9 @@ def starmodel(Msolar,Lsolar,Te,X,Z):
     #  to +99.9 or -99.9 as appropriate to avoid format field overflows.
     f.write('   r        Qm       L_r       T        P        rho      kap      eps     dlPdlT\n')
 
+    dt = [('index',int),('r',float),('Qm',float),('L',float),('T',float),('P',float),
+          ('rho',float),('kappa',float),('epsilon',float),('zone',str,1),('dlnPdlnT',float)]
+    tab = np.zeros(istop+1,dtype=np.dtype(dt))
     for ic in range(0,istop+1):
         i = istop - ic 
         Qm = 1.0 - M_r[i]/Ms    # Total mass fraction down to radius
@@ -725,12 +728,25 @@ def starmodel(Msolar,Lsolar,Te,X,Z):
         s='{0:7.2E} {1:7.2E} {2:7.2E} {3:7.2E} {4:7.2E} {5:7.2E} {6:7.2E} {7:6.2E}{8:1s}{9:1s} {10:5.1f}\n'.format(r[i], Qm, L_r[i], T[i], P[i], rho[i], kappa[i],epslon[i], clim, rcf, dlPdlT[i])  
         f.write(s)
 
+        # Put it in a table
+        tab['index'][i] = i+1           # shell number
+        tab['r'][i] = r[i]              # radius
+        tab['Qm'][i] = Qm               # total mass fraction down to radius
+        tab['L'][i] = L_r[i]            # luminosity
+        tab['T'][i] = T[i]              # temperature
+        tab['P'][i] = P[i]              # pressure
+        tab['rho'][i] = rho[i]          # density
+        tab['kappa'][i] = kappa[i]      # opacity
+        tab['epsilon'][i] = epslon[i]   # nuclear energy generation rate
+        tab['zone'][i] = rcf            # radiative or convective dominated
+        tab['dlnPdlnT'][i] = dlPdlT[i]  # d ln(P)/d ln(T)
+        
     #   Output to screen
     print()
     print('***** The integration has been completed *****')
     print('      The model has been stored in starmodl_py.dat')
     print()
-    return Igoof,ierr,istop
+    return Igoof,ierr,istop,tab
 
 def main():
 
@@ -752,5 +768,3 @@ def main():
                 print('You must have X + Z <= 1. Please reenter composition.')
 
     Igoof,ierr,istop = starmodel(Msolar,Lsolar,Te,X,Z)
-
-main()
